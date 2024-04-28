@@ -1,19 +1,22 @@
 import sqlite3
+import datetime
 
 
-user_id = 8
+user_id = 19
+id = 5
 conn = sqlite3.connect('habit_tracker1.db')
 cursor = conn.cursor()
-
-cursor.execute(
-    '''SELECT COUNT(habit_id)  FROM user_habits WHERE user_id = 8'''
-)
-count = cursor.fetchone()[0]  # Получаем результат запроса (первая строка, первый столбец)
-print(f"User {user_id} has {count} habits.")
-
-if count >= 3:
-    print(f"Maximum number of habits reached.\n"
-          f"Cannot add more habits.")
+#h.habit_name, h.habit_description, h.habit_goal
+cursor.execute("""
+        SELECT *
+        FROM habits h
+        JOIN user_habits uh ON h.id = uh.habit_id
+        WHERE (uh.user_id = ? AND uh.habit_id = ?)
+        """, (user_id, id,))
+habit_atributs = cursor.fetchall()
+print(habit_atributs)
+conn.commit()
+conn.close()
 
 #print(cursor.fetchall())
 # result = []
@@ -35,8 +38,6 @@ if count >= 3:
 #
 # print(info)
 
-conn.commit()
-conn.close()
 
 # cursor.execute('''
 # DELETE FROM habits WHERE id = 52
@@ -48,3 +49,32 @@ conn.close()
 
 
 # print("Database and tables updated successfully.")
+goal_time = '22.05.2024'
+goal_time_t = datetime.datetime.strptime(goal_time, "%d.%m.%Y")
+now = datetime.datetime.now()
+period = goal_time_t-now
+print(goal_time_t)
+print(period)
+
+
+
+# from datetime import datetime
+#
+# date_str = "22.05.2024"
+# date_obj = datetime.strptime(date_str, "%d.%m.%Y")
+#
+# print(date_obj)
+#
+# from datetime import datetime
+#
+# # Получаем текущую дату
+# current_date = datetime.now()
+#
+# # Преобразуем строку с целевой датой в объект datetime
+# target_date_str = "22.05.2024"
+# target_date = datetime.strptime(target_date_str, "%d.%m.%Y")
+#
+# # Вычисляем разницу между текущей датой и целевой датой
+# time_difference = target_date - current_date
+#
+# print(f"Разница между текущей датой и 22.05.2024: {time_difference}")

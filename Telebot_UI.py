@@ -1,5 +1,7 @@
 # Импорт модуля pyTelegramBotAPI для создания телеграм-бота
 # Импорт types для создания клавиатуры и кнопок в интерфейсе
+import datetime
+
 import telebot
 from telebot import types
 # Следующая строка не нужна, так как предыдущая уже импортирует нужные классы объектов types
@@ -8,7 +10,8 @@ from telebot import types
 # Импорт функций из файла Python Logic_Back_end.py
 from Logic_Back_end import (add_or_get_user,
                             add_habit_to_user_list, get_user_habits, get_new_habits,
-                            add_habit_to_user_list_directly, delete_habit_by_id, get_habit_info)  # get_all_habits
+                            add_habit_to_user_list_directly, delete_habit_by_id, get_habit_info, habit_edit)  # get_all_habits
+
 
 # Ввод токена основного телеграм-бота и инициализация программы:
 # TOKEN = '6795112102:AAFBiEZg3Jgi2XxAoqsJvLzUGfSsmvNempo'
@@ -17,7 +20,7 @@ from Logic_Back_end import (add_or_get_user,
 # !!! ПЕРЕКЛЮЧИТЬ НА ОСНОВНОЙ ТЕЛЕГРАМ-БОТ В ФИНАЛЬНОЙ ВЕРСИИ ПРОГРАММЫ !!!
 
 # Ввод токена тестового телеграм-бота и инициализация программы
-TEST_TOKEN = '7088266760:AAG2r0Dz3GJAymtpxqrQpapNgVC91u8E23Q'
+TEST_TOKEN = '6955302660:AAFxbQCz0FNNzuUvMJvCx0MqK1LAQDjN1Is'
 bot = telebot.TeleBot(TEST_TOKEN)
 
 
@@ -92,13 +95,22 @@ def send_welcome(message):
 @bot.callback_query_handler(func=lambda call: call.data == 'add_new_habit')
 def add_new_habit_button(call):
     # Начало диалога для добавления новой привычки
-    msg = bot.send_message(call.message.chat.id, "Введите название новой привычки:")
+    text = "Введите название новой привычки:"
+    msg = bot.send_message(call.message.chat.id, text)
+    # print(msg)
+    # print(f'Length: {len(f"{msg}".encode("utf-8"))} bytes')
+    # print(text)
+    # print(f'Length: {len(f"{text}".encode("utf-8"))} bytes')
+    # # answer = bot.answer_callback_query(call.message.chat.id)
+    # # print(answer)
+    # print(msg.text)
     bot.register_next_step_handler(msg, process_habit_name_step, user_id=call.from_user.id)
 
 
 # Функция - подгрузка имени новой привычки, переход к описанию привычки
 def process_habit_name_step(message, user_id):
     habit_name = message.text
+    print(f'Length: {len(habit_name.encode("utf-8"))} bytes')
     msg = bot.send_message(message.chat.id, "Введите описание привычки:")
     bot.register_next_step_handler(msg, process_habit_description_step, user_id=user_id, habit_name=habit_name)
 
@@ -114,18 +126,38 @@ def process_habit_description_step(message, user_id, habit_name):
 # Функция - подгрузка цели новой привычки, переход к частоте напоминаний
 def process_habit_goal_step(message, user_id, habit_name, description):
     goal = message.text
-    msg = bot.send_message(message.chat.id, "Введите частоту напоминаний (например, 'ежедневно'):")
-    bot.register_next_step_handler(msg, process_habit_frequency_step, user_id=user_id, habit_name=habit_name,
+    msg = bot.send_message(message.chat.id, f"Частота оповещений установлена по умолчанию - ежедневно.\n"
+                                            f"Введите целевую дату достижения (в формате DD.MM.YYYY):")
+    bot.register_next_step_handler(msg, process_habit_date_step, user_id=user_id, habit_name=habit_name,
                                    description=description, goal=goal)
 
 
 # Функция - подгрузка частоты напоминаний; вызов функции, которая добавит привычку в таблицы habits и user_habits
-def process_habit_frequency_step(message, user_id, habit_name, description, goal):
-    frequency = message.text
+# def process_habit_frequency_step(message, user_id, habit_name, description, goal):
+#     frequency = message.text.lower()
+#     print(frequency)
+#     while frequency != 'ежедневно' and frequency != 'еженедельно':
+#         bot.send_message(message.chat.id, 'Повторите попытку (ежедневно или еженедельно)')
+#
+#         return
+#
+#     msg = bot.send_message(message.chat.id, "Введите целевую дату достижения (в формате DD.MM.YYYY):")
+#     bot.register_next_step_handler(msg, process_habit_date_step, user_id=user_id, habit_name=habit_name,
+#                                    description=description, goal=goal, frequency=frequency)
+#
+#     # msg = bot.send_message(message.chat.id, "Введите целевую дату достижения (в формате DD.MM.YYYY):")
+#     # bot.register_next_step_handler(msg, process_habit_date_step, user_id=user_id, habit_name=habit_name,
+#     #                                description=description, goal=goal, frequency=frequency)
+
+
+def process_habit_date_step(message, user_id, habit_name, description, goal):
+    date_goal = message.text
     username = message.from_user.username
     # Добавляем привычку в базу и связываем её с пользователем
-    add_habit_to_user_list_directly(username, user_id, habit_name, description, goal, frequency)
+    add_habit_to_user_list_directly(username, user_id, habit_name, description, goal, date_goal, frequency="ежедневно")
     bot.send_message(message.chat.id, "Привычка успешно добавлена в ваш список.")
+
+
 
 
 # Функция - обработка запроса на вызов функции show_all_habits()
@@ -241,20 +273,40 @@ def habit_options(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('view_'))
 def view_habit(call):
     habit_id = call.data.split('_')[1]
+    print(habit_id)
     habit_details = get_habit_info(habit_id)  # предполагается, что эта функция возвращает детали привычки
     bot.answer_callback_query(call.id)
     bot.send_message(call.message.chat.id, f'Название привычки: {habit_details[0][0]}\n'
                      f'Описание: {habit_details[0][1]}\n'
-                     f'Цель: {habit_details[0][2]}')
+                     f'Цель: {habit_details[0][2]}\n'
+                     f'Целевая дата: {habit_details[0][3]}')
 
 
 # Функция - вызов редактирования привычки пользователя - ПОКА НЕ ОБРАБАТЫВАЕТ ДАННЫЕ
 @bot.callback_query_handler(func=lambda call: call.data.startswith('edit_'))
 def edit_habit(call):
+    user_id = get_user_id(call.from_user, call)
+    print(f'USER ID {user_id}')
     habit_id = call.data.split('_')[1]
+    print(habit_id)
     # Предполагаем, что функция редактирования возвращает успешный результат или сообщение об ошибке
-    bot.answer_callback_query(call.id)
-    bot.send_message(call.message.chat.id, "Введите новые данные для привычки. (Это место для диалога редактирования)")
+    habit_atributs = habit_edit(habit_id, user_id)
+    print(habit_atributs[0][0])
+    print(habit_atributs[0][1])
+    markup = types.InlineKeyboardMarkup()
+    # for habit_atribut in habit_atributs:
+    #     for h_a in habit_atribut:
+    #         print(h_a)
+    #         button = types.InlineKeyboardButton(h_a, callback_data=f'editatr_{h_a}')
+    #         markup.add(button)
+
+    ha_name = types.InlineKeyboardButton(f"Изменить имя", callback_data=f'editname_{habit_atributs[0][0]}')
+    ha_goal = types.InlineKeyboardButton(f"Изменить цель", callback_data=f'editgoal_{habit_atributs[0][1]}')
+    ha_goal = types.InlineKeyboardButton(f"Изменить цель", callback_data=f'editgoal_{habit_atributs[0][2]}')
+    markup.add(ha_name)#, ha_desc, ha_goal)
+    bot.send_message(call.message.chat.id, f"Выберите поле для изменения.", reply_markup=markup)
+
+    # bot.send_message(call.message.chat.id, "Введите новые данные для привычки. (Это место для диалога редактирования)")
 
 
 # Функция - удаление привычки из списка привычек пользователя
@@ -272,6 +324,13 @@ def delete_habit(call):
         bot.answer_callback_query(call.id, "Не удалось удалить привычку. Пожалуйста, попробуйте позже.")
         bot.send_message(call.message.chat.id, "Не удалось удалить привычку. Пожалуйста, попробуйте позже.")
 
+# def send_reminders(chat_id, user_id):
+#     rem_time = '18:00'
+#     while True:
+#         now = datetime.datetime.now().strftime('%H:%M')
+#         if rem_time == now:
+#             bot.send_message(chat_id, )
+#     goal_date =
 
 # Запуск работы телеграм-бота с пользователем
 bot.polling()

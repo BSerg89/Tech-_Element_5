@@ -1,5 +1,8 @@
 # Импортируем модуль для работы с SQLite
 import sqlite3
+import datetime
+import time
+
 
 
 # Подключаемся к базе данных 'habit_tracker1.db'
@@ -63,7 +66,7 @@ def add_new_habit(user_id, habit_name, description, goal, frequency):
 
 
 # Функция добавления новой привычки в базу данных - и в таблицу habits, и в таблицу user_habits
-def add_habit_to_user_list_directly(username, user_id, habit_name, description, goal, frequency='ежедневно'):
+def add_habit_to_user_list_directly(username, user_id, habit_name, description, goal, date_goal, frequency):
     conn = connect_to_db()
     cursor = conn.cursor()
     true_user_id = add_or_get_user(username)
@@ -75,8 +78,8 @@ def add_habit_to_user_list_directly(username, user_id, habit_name, description, 
                        (true_user_id, habit_name, description, goal, frequency))
         habit_id = cursor.lastrowid  # Получаем ID новой привычки
         # Добавляем привычку в список привычек пользователя
-        cursor.execute("INSERT INTO user_habits (user_id, habit_id, reminder_frequency) VALUES (?, ?, ?)",
-                       (true_user_id, habit_id, frequency))
+        cursor.execute("INSERT INTO user_habits (user_id, habit_id, reminder_frequency, date_goal) VALUES (?, ?, ?, ?)",
+                       (true_user_id, habit_id, frequency, date_goal))
         conn.commit()
     finally:
         conn.close()
@@ -173,19 +176,33 @@ def get_habit_info(habit_id):
     conn = connect_to_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT h.habit_name, h.habit_description, h.habit_goal
+        SELECT h.habit_name, h.habit_description, h.habit_goal, uh.date_goal
         FROM habits h
+        JOIN user_habits uh ON h.id = uh.habit_id
         WHERE h.id = ?
     """, (habit_id,))
     habit_details = cursor.fetchall()
     conn.close()
     return habit_details
 
+def habit_edit(habit_id, user_id):
+    conn = connect_to_db()
+    cursor = conn.cursor()
+    # h.habit_name, h.habit_description, h.habit_goal
+    cursor.execute("""
+        SELECT h.habit_name, h.goal, h.frequency
+        FROM habits h
+        JOIN user_habits uh ON h.id = uh.habit_id
+        WHERE (uh.user_id = ? AND uh.habit_id = ?)
+        """, (user_id, habit_id,))
+    habit_atributs = cursor.fetchall()
+    print(habit_atributs)
+    return habit_atributs
 
 # Функция удаления привычки из таблицы 'user_habits'
 def delete_habit_by_id(habit_id, user_id):
     try:
-        with connect_to_db() as conn:
+            conn = connect_to_db()
             cursor = conn.cursor()
             # Удаление привычки из таблицы user_habits
             cursor.execute("DELETE FROM user_habits WHERE (habit_id = ? AND user_id = ?)",
@@ -196,8 +213,10 @@ def delete_habit_by_id(habit_id, user_id):
             print("Привычка успешно удалена.")
             return True
     except Exception as e:
-        print(f"Ошибка при удалении привычки: {e}")
-        return False
+            print(f"Ошибка при удалении привычки: {e}")
+            return False
+    finally:
+            conn.close()
 
 
 
